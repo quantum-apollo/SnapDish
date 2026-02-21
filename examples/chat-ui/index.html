@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>SnapDish — Chat with nearby restaurant listings</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="chat-layout">
+    <main class="chat-main">
+      <div class="messages">
+        <div class="message assistant">
+          <p>Here are some nearby spots you might like, based on what you’re cooking. All have good reviews and are within a short drive.</p>
+          <!-- Enriched discovery block: rounded container, card list (like blog fullscreen mode) -->
+          <div class="discovery-block">
+            <div class="discovery-cards">
+              <article class="card">
+                <div class="card-image-wrap">
+                  <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=240&fit=crop" alt="" class="card-image" />
+                </div>
+                <div class="card-body">
+                  <h3 class="card-title">Trattoria Roma</h3>
+                  <p class="card-meta">Italian · 0.5 km</p>
+                  <p class="card-address">123 Main St</p>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card-image-wrap">
+                  <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=240&fit=crop" alt="" class="card-image" />
+                </div>
+                <div class="card-body">
+                  <h3 class="card-title">Green Leaf Kitchen</h3>
+                  <p class="card-meta">Healthy · 0.8 km</p>
+                  <p class="card-address">45 Oak Ave</p>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card-image-wrap">
+                  <img src="https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400&h=240&fit=crop" alt="" class="card-image" />
+                </div>
+                <div class="card-body">
+                  <h3 class="card-title">The Local Grill</h3>
+                  <p class="card-meta">American · 1.2 km</p>
+                  <p class="card-address">78 Park Rd</p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+        <div class="message user">
+          <p>Show me more Italian options under 1 km</p>
+        </div>
+      </div>
+      <div class="input-area">
+        <input type="text" class="chat-input" placeholder="Ask Chef Marco…" aria-label="Message" />
+        <button type="button" class="send-btn" aria-label="Send">Send</button>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,12 @@
+backend/.venv/
+node_modules/
+mobile/node_modules/
+mobile/React-Native-Snapchat-Clone/node_modules/
+mobile/.expo/
+mobile/React-Native-Snapchat-Clone/.expo/
+.DS_Store
+Thumbs.db
+.env
+*.pyc
+__pycache__/
+*.log

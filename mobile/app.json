@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "SnapDish",
+    "slug": "snapdish",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "snapdish",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.snapdish.app"
+    },
+    "android": {
+      "package": "com.snapdish.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-font"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "43572c86-319a-4bdd-8752-0dd8b447ba6b"
+      }
+    }
+  }
+}
