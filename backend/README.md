@@ -1,5 +1,7 @@
 # SnapDish Backend (FastAPI)
 
+Production-first, enterprise standards: API key from AWS Secrets Manager only; no localhost or .env in production; batch for throughput.
+
 ## Setup
 1) Create and activate a virtualenv
 - `py -3.12 -m venv backend\.venv`
@@ -8,11 +10,11 @@
 2) Install deps
 - `pip install -r backend/requirements.txt`
 
-3) Configure env
-- Ensure `OPENAI_API_KEY` is set (or place it in the repo root `.env`).
-
-Optional:
-- Set `SNAPDISH_MODEL` (default is `gpt-5.2`).
+3) Production config (required for production)
+- **AWS_SECRET_NAME** – Secret name in AWS Secrets Manager. Secret must be JSON with `OPENAI_API_KEY` (e.g. `{"OPENAI_API_KEY": "sk-..."}`). The API key is read only from Secrets; no env or .env fallback.
+- **SNAPDISH_CORS_ORIGINS** – Comma-separated allowed origins (e.g. `https://app.snapdish.com`). No wildcard in production.
+- **SNAPDISH_LOG_JSON=1** – Use for CloudWatch (structured JSON logs).
+- Optional: `SNAPDISH_MODEL`, `AWS_REGION`, `SNAPDISH_MAX_BODY_MB`, `SNAPDISH_MAX_BATCH_SIZE`.
 
 ## Run
 - `python -m uvicorn backend.snapdish.main:app --reload --port 8000`
@@ -23,11 +25,11 @@ Optional:
 - `POST /v1/voice` – send base64 PCM audio, get Chef Marco’s voice response (base64 PCM, 24 kHz)
 - `GET /healthz`
 
-## Batch responses (lower cost)
+## Batch (recommended for multiple requests)
 
-**Option 1: Same-request batch** — `POST /v1/analyze/batch` with a JSON body `{ "requests": [ {...}, ... ] }`. The server runs them in parallel and returns all results in one response. Same per-token cost as single requests; use for throughput when you have many requests in one call.
+**Option 1: Same-request batch** — `POST /v1/analyze/batch` with `{ "requests": [ {...}, ... ] }`. Use for high throughput: one shared OpenAI client; up to 100 per call.
 
-**Option 2: OpenAI Batch API (50% cost discount)** — For non-urgent jobs (e.g. nightly evals, bulk analysis), use the script so requests are sent via the [Batch API](https://platform.openai.com/docs/guides/batch): **50% cheaper**, higher rate limits, results within 24 hours.
+**Option 2: OpenAI Batch API (50% cost discount)** — For non-urgent bulk jobs, use the script via the [Batch API](https://platform.openai.com/docs/guides/batch): 50% cheaper, higher rate limits, results within 24 hours.
 
 1. Create a JSONL file with one request per line, e.g.  
    `{"custom_id": "req-1", "user_text": "How do I make carbonara?"}`  

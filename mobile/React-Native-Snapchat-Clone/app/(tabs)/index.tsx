@@ -16,9 +16,9 @@ import Animated, {
   LinearTransition,
 } from "react-native-reanimated";
 import CameraTools from "@/components/CameraTools";
-import * as WebBrowser from "expo-web-browser";
-import QRCodeButton from "@/components/QRCodeButton";
 import VideoViewComponent from "@/components/VideoView";
+import BarcodeInsightView from "@/components/BarcodeInsightView";
+import { Chip } from "react-native-paper";
 
 export default function HomeScreen() {
   const cameraRef = React.useRef<CameraView>(null);
@@ -30,14 +30,19 @@ export default function HomeScreen() {
   );
   const [cameraZoom, setCameraZoom] = React.useState<number>(0);
   const [picture, setPicture] = React.useState<string>(""); // "https://picsum.photos/seed/696/3000/2000"
-  const [video, setVideo] = React.useState<string>(
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-  ); //  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+  const [video, setVideo] = React.useState<string>("");
 
-  const [isBrowsing, setIsBrowsing] = React.useState<boolean>(false);
   const [isRecording, setIsRecording] = React.useState<boolean>(false);
-  const [qrCodeDetected, setQrCodeDetected] = React.useState<string>("");
-  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [scannedBarcode, setScannedBarcode] = React.useState<{ data: string; type: string } | null>(null);
+  const [activeBarcode, setActiveBarcode] = React.useState<{ data: string; type: string } | null>(null);
+  const barcodeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleBarcodeScanned = (result: BarcodeScanningResult) => {
+    if (!result.data || activeBarcode) return;
+    setScannedBarcode({ data: result.data, type: result.type });
+    if (barcodeTimeoutRef.current) clearTimeout(barcodeTimeoutRef.current);
+    barcodeTimeoutRef.current = setTimeout(() => setScannedBarcode(null), 4000);
+  };
 
   async function handleTakePicture() {
     const response = await cameraRef.current?.takePictureAsync({});
@@ -55,33 +60,17 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleOpenQRCode() {
-    setIsBrowsing(true);
-    const browserResult = await WebBrowser.openBrowserAsync(qrCodeDetected, {
-      presentationStyle: WebBrowser.WebBrowserPresentationStyle.FORM_SHEET,
-    });
-    if (browserResult.type === "cancel") {
-      setIsBrowsing(false);
-    }
-  }
 
-  const handleBarcodeScanned = async (result: BarcodeScanningResult) => {
-    if (result.data) {
-      setQrCodeDetected(result.data);
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        setQrCodeDetected("");
-      }, 1000);
-    }
-  };
-
-  if (isBrowsing) return <></>;
   if (picture) return <PictureView picture={picture} setPicture={setPicture} />;
   if (video) return <VideoViewComponent video={video} setVideo={setVideo} />;
+  if (activeBarcode) {
+    return (
+      <BarcodeInsightView
+        barcode={activeBarcode}
+        onClose={() => setActiveBarcode(null)}
+      />
+    );
+  }
   return (
     <Animated.View
       layout={LinearTransition}
@@ -97,15 +86,31 @@ export default function HomeScreen() {
         zoom={cameraZoom}
         enableTorch={cameraTorch}
         flash={cameraFlash}
-        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39", "qr"] }}
         onBarcodeScanned={handleBarcodeScanned}
-        onCameraReady={() => console.log("camera is ready")}
+        onCameraReady={() => {}}
       >
         <SafeAreaView style={{ flex: 1, paddingTop: 40 }}>
           <View style={{ flex: 1, padding: 6 }}>
-            {qrCodeDetected ? (
-              <QRCodeButton handleOpenQRCode={handleOpenQRCode} />
-            ) : null}
+            {scannedBarcode && (
+              <Chip
+                icon="barcode-scan"
+                onPress={() => {
+                  setActiveBarcode(scannedBarcode);
+                  setScannedBarcode(null);
+                }}
+                style={{
+                  position: "absolute",
+                  alignSelf: "center",
+                  top: "60%",
+                  zIndex: 10,
+                  backgroundColor: "rgba(0,0,0,0.75)",
+                }}
+                textStyle={{ color: "#fff" }}
+              >
+                Tap to analyze product
+              </Chip>
+            )}
             <CameraTools
               cameraZoom={cameraZoom}
               cameraFlash={cameraFlash}

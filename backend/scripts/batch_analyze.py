@@ -1,6 +1,3 @@
-import logging
-# Allow importing from snapdish when run from backend/
-logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 #!/usr/bin/env python3
 """
 Submit SnapDish analyze requests via the OpenAI Batch API for ~50% lower cost.
@@ -33,12 +30,19 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+
 # Allow importing from snapdish when run from backend/
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from openai import OpenAI
 
+from snapdish.config import configure_logging, get_env, get_logger, get_secret
 from snapdish.prompts import CHEF_SYSTEM_PROMPT
+
+configure_logging()
+logger = get_logger(__name__)
 
 
 def _build_input_content(row: dict) -> list[dict]:
@@ -115,7 +119,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default=os.environ.get("SNAPDISH_MODEL", "gpt-5.2"),
+        default=get_env("SNAPDISH_MODEL") or get_secret("SNAPDISH_MODEL") or "gpt-5.2",
         help="Model ID (default: SNAPDISH_MODEL or gpt-5.2)",
     )
     parser.add_argument(
@@ -135,20 +139,20 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = get_secret("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise SystemExit("Set OPENAI_API_KEY")
+        raise SystemExit("Set OPENAI_API_KEY or AWS_SECRET_NAME with OPENAI_API_KEY")
 
-    client = OpenAI()
+    client = OpenAI(api_key=api_key)
 
     if args.poll or args.download:
         if not args.input_file_or_batch_id:
             raise SystemExit("Provide batch_id when using --poll or --download")
         batch_id = args.input_file_or_batch_id
         batch = client.batches.retrieve(batch_id)
-        logging.info(f"Batch {batch.id} status: {batch.status}")
+        logger.info("Batch %s status: %s", batch.id, batch.status)
         if args.poll and batch.status not in ("completed", "failed", "expired", "cancelled"):
-            logging.info("Poll until completed; run again with --poll to re-check.")
+            logger.info("Poll until completed; run again with --poll to re-check.")
             return
         if args.download and batch.status == "completed" and batch.output_file_id:
             content = client.files.content(batch.output_file_id)
@@ -159,9 +163,9 @@ def main() -> None:
             if n is None and isinstance(rc, dict):
                 n = rc.get("completed", 0)
             n = n or 0
-            logging.info(f"Wrote {n} results to {args.output}")
+            logger.info("Wrote %s results to %s", n, args.output)
         elif args.download and batch.status != "completed":
-            logging.warning("Batch not completed; no output to download.")
+            logger.warning("Batch not completed; no output to download.")
         return
 
     # Submit new batch
@@ -176,7 +180,7 @@ def main() -> None:
     with open(batch_input_path, "w", encoding="utf-8") as f:
         for r in request_lines:
             f.write(json.dumps(r) + "\n")
-    logging.info(f"Wrote {len(request_lines)} requests to {batch_input_path}")
+    logger.info("Wrote %s requests to %s", len(request_lines), batch_input_path)
 
     with open(batch_input_path, "rb") as f:
         file_obj = client.files.create(file=f, purpose="batch")
@@ -185,9 +189,9 @@ def main() -> None:
         endpoint="/v1/responses",
         completion_window="24h",
     )
-    logging.info(f"Batch created: {batch.id}")
-    logging.info(f"Status: {batch.status}. Check: python scripts/batch_analyze.py --poll {batch.id}")
-    logging.info(f"Download when done: python scripts/batch_analyze.py --download {batch.id} -o results.jsonl")
+    logger.info("Batch created: %s", batch.id)
+    logger.info("Status: %s. Check: python scripts/batch_analyze.py --poll %s", batch.status, batch.id)
+    logger.info("Download when done: python scripts/batch_analyze.py --download %s -o results.jsonl", batch.id)
 
 
 if __name__ == "__main__":

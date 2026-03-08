@@ -3,7 +3,57 @@ uvicorn[standard]==0.30.6
 pydantic==2.10.6
 python-dotenv==1.0.1
 openai>=2.20.0
+boto3>=1.35.0
+# Authentication: Cognito JWT validation (RS256)
+PyJWT[crypto]>=2.8.0
+cryptography>=42.0.0
+# Rate limiting
+slowapi>=0.1.9
 # Voice: Agents SDK + voice extras + audio I/O
 openai-agents[voice]>=0.0.12
 numpy>=1.24.0
 sounddevice>=0.4.6
+# Database (PostgreSQL via SQLAlchemy 2.x)
+sqlalchemy>=2.0.0
+psycopg[binary]>=3.1.0
+# Caching (Redis / ElastiCache)
+redis>=5.0.0
+# HTTP client for food API integrations
+httpx>=0.27.0
+# Database migrations (run separately: alembic upgrade head)
+alembic>=1.13.0
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Food API integration notes (REST APIs — no pip package needed, just API keys)
+# Keys are stored in AWS Secrets Manager; see config.py get_secret()
+# ─────────────────────────────────────────────────────────────────────────────
+# USDA FoodData Central (600K+ foods, free)
+#   USDA_FDC_API_KEY → https://fdc.nal.usda.gov/api-guide.html
+#
+# Open Food Facts (3.5M+ products, no key)
+#   No key required → https://world.openfoodfacts.org/files/api-documentation.html
+#
+# Edamam Recipe Database (2.3M+ recipes)
+#   EDAMAM_APP_ID + EDAMAM_APP_KEY → https://developer.edamam.com/edamam-docs-recipe-api
+#
+# Edamam Food/Nutrition Database (900K+ foods)
+#   EDAMAM_FOOD_APP_ID + EDAMAM_FOOD_APP_KEY → https://developer.edamam.com/food-database-api
+#
+# Nutritionix (900K+ branded + 1M+ restaurant items)
+#   NUTRITIONIX_APP_ID + NUTRITIONIX_APP_KEY → https://www.nutritionix.com/business/api
+#
+# TheMealDB v2 (5K+ international structured meals)
+#   THEMEALDB_API_KEY ("1" for test, Patreon key for production)
+#   → https://www.themealdb.com/api.php
+#
+# Spoonacular (5K+ curated recipes)
+#   SPOONACULAR_API_KEY → https://spoonacular.com/food-api/docs
+#
+# Google Places (nearby store lookup)
+#   GOOGLE_PLACES_API_KEY → https://developers.google.com/maps/documentation/places/web-service
+#
+# Web search (food-only guardrail-gated)
+#   Powered natively by OpenAI Responses API web_search_preview tool.
+#   No third-party search API keys needed — uses OPENAI_API_KEY already configured.
+#   Docs: https://platform.openai.com/docs/guides/tools-web-search
+

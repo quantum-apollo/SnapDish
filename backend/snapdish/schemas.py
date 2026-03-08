@@ -146,3 +146,78 @@ class AnalyzeBatchResponse(BaseModel):
     """Results of a batch analyze call."""
 
     results: list[AnalyzeBatchResult] = Field(..., description="One result per request, same order.")
+
+
+# --- Dietary profile management endpoints ---
+
+class DietaryProfileRequest(BaseModel):
+    """
+    Update a user's dietary profile. Sent to authenticated endpoints only.
+    Tags are validated server-side against the allowed vocabulary in models.py.
+    """
+
+    allergy_tags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Allergy identifiers from the server vocabulary: peanuts, tree_nuts, dairy, "
+            "eggs, wheat, gluten, soy, fish, shellfish, sesame, mustard, sulphites, "
+            "celery, lupin, molluscs."
+        ),
+    )
+    restriction_tags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Dietary restrictions: vegan, vegetarian, pescatarian, halal, kosher, "
+            "raw_food, paleo, keto, low_fodmap."
+        ),
+    )
+    condition_tags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Medical/health conditions: diabetes_type1, diabetes_type2, prediabetes, "
+            "celiac, crohns, ibs, hypertension, heart_disease, kidney_disease, gout, "
+            "phenylketonuria, pregnancy, immunocompromised."
+        ),
+    )
+    disliked_ingredients: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Ingredients the user dislikes (max 50, each max 64 chars).",
+    )
+    preferred_cuisines: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Preferred cuisine types for suggestions (max 20).",
+    )
+    custom_notes: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional free-text dietary notes (max 500 chars).",
+    )
+
+
+class DietaryProfileResponse(BaseModel):
+    user_id: str
+    allergy_tags: list[str]
+    restriction_tags: list[str]
+    condition_tags: list[str]
+    disliked_ingredients: list[str]
+    preferred_cuisines: list[str]
+    custom_notes: str | None = None
+
+
+# --- Meal alternatives (enriched response) ---
+
+class MealAlternativeResult(BaseModel):
+    name: str
+    cuisine_tags: list[str] = Field(default_factory=list)
+    dietary_tags: list[str] = Field(default_factory=list)
+    calories_kcal: float | None = None
+    protein_g: float | None = None
+    carbs_g: float | None = None
+    fat_g: float | None = None
+    fiber_g: float | None = None
+    why_safe: str = ""
+    image_url: str | None = None
+    source: str = ""
+

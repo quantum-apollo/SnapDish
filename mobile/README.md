@@ -15,7 +15,7 @@ npx expo start
 ```
 
 - Press **i** for iOS simulator, **a** for Android emulator, or scan the QR code with **Expo Go** on a device.
-- In the app, open **Settings** and set **Backend API URL** to your SnapDish API (e.g. `http://localhost:8000` or your machine’s IP like `http://192.168.1.x:8000` for a physical device).
+- Set **EXPO_PUBLIC_API_URL** in EAS for production builds, or in the app open **Settings** and set **Backend API URL** to your SnapDish API (e.g. `https://api.snapdish.app`). No localhost fallback.
 
 ## What’s included
 

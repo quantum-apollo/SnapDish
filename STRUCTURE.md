@@ -1,60 +1,168 @@
+
 # SnapDish — Directory tree & file descriptions
 
-Concise overview of the repo. **Vision** is used in the API and prompts; **commerce** is documented for ChatGPT Instant Checkout (Agentic Commerce Protocol).
+This file documents the actual directory structure and provides a concise description of every file and folder, including extra and missing items compared to the original plan. Auto-generated and empty folders are noted but not described in detail.
+
+## Root
 
 ```
 SnapDish/
-├── .gitignore
-├── STRUCTURE.md              # This file: directory tree + short descriptions
-├── TODO.md                   # Per-file checklist: endpoints and tasks to complete (fill in later)
+├── .env                  # Environment variables (local, not in VCS)
+├── .gitignore            # Git ignore rules
+├── STRUCTURE.md          # This file: directory tree + short descriptions
+├── TODO.md               # Per-file checklist: endpoints and tasks to complete
+├── run-local.ps1         # PowerShell script to run the project locally
+├── _backup/              # (Empty) Placeholder for backups
+├── .venv/                # Python virtual environment (auto-generated)
+├── node_modules/         # Node.js dependencies (auto-generated)
 │
-├── docs/
-│   ├── CHAT_UI.md            # Chat UI (mobile-first): nearby restaurant listings, enriched discovery, rounded corners, chat at bottom
-│   ├── COMMERCE.md           # Agentic Commerce Protocol, Instant Checkout (ChatGPT), implementation checklist
-│   ├── DEVELOPER_NOTES.md    # Curated OpenAI refs: Realtime API, Skills/Shell/Compaction, ChatGPT Apps, Evals for skills
-│   ├── FRONTEND_TEMPLATES.md # OpenAI + mobile UI templates: ChatKit, Pizzaz, Tamagui/NativeUI (better than Material for mobile)
-│   ├── MOBILE_APP.md         # iOS/Android app: Expo stack, app structure, backend API, checklist
-│   ├── PRODUCT_FEED.md      # Product feed onboarding, delivery, field reference, best practices
-│   └── PROMPTING_RESOURCES.md # Prompting libs, evals tools, guides, videos, papers (reasoning/CoT)
+├── backend/              # FastAPI backend for SnapDish
+│   ├── README.md             # Documentation for backend setup, endpoints, and usage. (90% ready)
+│   ├── requirements.txt      # Python dependencies (FastAPI, OpenAI, etc.). (95% ready)
+│   ├── run.ps1               # PowerShell script to start the API. (90% ready)
+│   ├── test_analyze.ps1      # Script to test the analyze endpoint. (40% ready)
+│   ├── scripts/              # Utility scripts for batch processing, debugging, and voice assistant.
+│   │   ├── batch_analyze.py      # Bulk analysis via OpenAI Batch API. (80% ready)
+│   │   ├── inspect_response.py   # Dev script to call Responses API and print output. (30% ready)
+│   │   └── voice_assistant.py    # CLI for real-time voice assistant (mic input, agent pipeline). (50% ready)
+│   └── snapdish/             # Main backend code for SnapDish API and agent logic.
+│       ├── __init__.py           # Package marker for snapdish module. (100% ready)
+│       ├── cache.py              # Enterprise caching layer: Redis primary, thread-safe in-memory LRU fallback. (100% ready)
+│       ├── db.py                 # SQLAlchemy 2.x engine, session factory, create_all_tables(). (100% ready)
+│       ├── models.py             # ORM models: User, UserDietaryProfile, CachedMeal, CachedIngredient, GuardrailRule + controlled vocabulary frozensets. (100% ready)
+│       ├── guardrails.py         # Code-level guardrails: input/output/search enforcement, DB-backed rules, seed_guardrail_rules(). (100% ready)
+│       ├── food_api.py           # 7-source food API integrations: USDA FDC, Open Food Facts, Edamam (recipe+food), Nutritionix, TheMealDB, Spoonacular — parallel search with caching. (100% ready)
+│       ├── meal_repository.py    # Tiered meal alternatives (cache → DB → APIs → persist) and ingredient nutrition lookup. (100% ready)
+│       ├── dietary_service.py    # Server-side dietary profile: JWT extraction, profile CRUD, non-tamperable safety prompt builder. (100% ready)
+│       ├── main.py               # FastAPI app: health, analyze, batch, voice, meal alternatives, dietary profile endpoints. Guardrails wired on all text endpoints. (100% ready)
+│       ├── openai_client.py      # Loads OpenAI API key and returns a client. (90% ready)
+│       ├── prompts.py            # Chef Marco system prompt: multicultural, multimodal, dietary-safe, food-only guardrail. (100% ready)
+│       ├── schemas.py            # Pydantic models: Analyze, Voice, DietaryProfile, MealAlternative. (100% ready)
+│       ├── commerce_schemas.py   # Pydantic models for commerce/checkout (Agentic Commerce Protocol). (90% ready)
+│       ├── tools.py              # Real store lookup (Google Places), USDA FDC nutrition, haversine distance. (100% ready)
+│       ├── voice_agent.py        # Multi-agent voice pipeline: triage, knowledge (real tools), account, search (guardrail-gated food_web_search). (100% ready)
+│       └── __pycache__/          # Python bytecode cache (auto-generated)
+│           ├── main.cpython-312.pyc           # Compiled bytecode for main.py
+│           ├── openai_client.cpython-312.pyc  # Compiled bytecode for openai_client.py
+│           ├── prompts.cpython-312.pyc        # Compiled bytecode for prompts.py
+│           ├── schemas.cpython-312.pyc        # Compiled bytecode for schemas.py
+│           ├── tools.cpython-312.pyc          # Compiled bytecode for tools.py
+│           └── __init__.cpython-312.pyc       # Compiled bytecode for __init__.py
 │
-├── mobile/                   # Expo (React Native) app — iOS & Android, one codebase
-│   ├── app/                  # Expo Router: _layout, (tabs)/index (chat), (tabs)/settings
-│   ├── src/api/client.ts     # analyze(), voice(), base URL from Settings
-│   ├── package.json
-│   └── README.md             # Run, switch UI template (Tamagui/NativeUI), next steps
+├── docs/                   # Documentation and design notes
+│   ├── CHAT_UI.md              # Chat UI design and data shape
+│   ├── COMMERCE.md             # Agentic Commerce Protocol and implementation
+│   ├── DEVELOPER_NOTES.md      # OpenAI references, agent skills, and evals
+│   ├── FRONTEND_TEMPLATES.md   # UI templates and recommendations
+│   ├── MOBILE_APP.md           # Mobile app structure, stack, and API
+│   ├── PRODUCT_FEED.md         # Product feed onboarding and field reference
+│   └── PROMPTING_RESOURCES.md  # Prompting tools, guides, and papers
 │
 ├── examples/
-│   └── chat-ui/              # Mobile-first reference: chat + restaurant cards (rounded), input at bottom, safe areas (see docs/CHAT_UI.md)
-│       ├── index.html
-│       ├── styles.css
-│       └── README.md
+│   └── chat-ui/              # Mobile-first chat UI mockup (HTML/CSS)
+│       ├── index.html            # Example chat UI with enriched discovery block
+│       ├── styles.css            # Mobile-first CSS for chat UI
+│       └── README.md             # How to use the chat UI example
 │
-├── backend/
-│   ├── README.md             # Setup, run, endpoints, voice assistant, HTTP voice API
-│   ├── requirements.txt     # FastAPI, OpenAI, openai-agents[voice], numpy, sounddevice
-│   ├── run.ps1              # Start API (creates venv if needed, uvicorn on port 8000)
-│   ├── test_analyze.ps1      # Script to hit POST /v1/analyze (e.g. test vision + text)
-│   │
-│   ├── scripts/
-│   │   ├── batch_analyze.py       # OpenAI Batch API: submit JSONL for 50% cost (analyze)
-│   │   ├── inspect_response.py   # Dev: call Responses API with JSON mode, print output
-│   │   └── voice_assistant.py    # CLI: mic → Chef Marco voice pipeline → speaker
-│   │
-│   └── snapdish/
-│       ├── __init__.py
-│       ├── main.py           # FastAPI app: /healthz, /v1/analyze, /v1/analyze/batch, /v1/voice
-│       ├── openai_client.py  # OpenAI client from OPENAI_API_KEY (.env)
-│       ├── prompts.py        # CHEF_SYSTEM_PROMPT (vision rules, JSON output schema)
-│       ├── schemas.py        # Pydantic: AnalyzeRequest/Response, VoiceRequest/Response, etc.
-│       ├── commerce_schemas.py   # Pydantic stubs for Agentic Checkout (sessions, line items, fulfillment)
-│       ├── tools.py          # Stubs: find_nearby_stores, estimate_nutrition_stub, build_grocery_list
-│       └── voice_agent.py    # Multi-agent voice: triage → Knowledge / Account / Search agents
+├── mobile/                  # Expo (React Native) app — iOS & Android, one codebase
+│   ├── README.md                # How to run and customize the mobile app
+│   ├── TEMPLATE_SOURCE.md       # UI template and icon source documentation
+│   ├── app.json                 # Expo app config
+│   ├── babel.config.js          # Babel config for React Native
+│   ├── eas.json                 # EAS build config
+│   ├── tamagui.config.ts        # Tamagui UI config (optional)
+│   ├── tsconfig.json            # TypeScript config
+│   ├── assets/                  # (Empty) Placeholder for assets
+│   ├── snapdish/                # (Empty) Placeholder for future code
+│   ├── src/
+│   │   └── api/
+│   │       └── client.ts            # API client for analyze/voice endpoints
+│   └── React-Native-Snapchat-Clone/ # Full-featured Expo React Native app (not in original plan)
+│       ├── app/                      # Expo Router structure for screens and navigation
+│       ├── assets/                   # Fonts and images
+│       ├── components/               # UI components (camera, chat, navigation, etc.)
+│       ├── constants/                # Color themes
+│       ├── hooks/                    # Custom React hooks
+│       ├── scripts/                  # Project reset script
+│       ├── src/api/                  # API client and initialization
+│       ├── tsconfig.json, babel.config.js, etc. # Project configs
+│       └── node_modules/             # Node.js dependencies (auto-generated)
 │
-└── prompts/
-    ├── chef_marco_system.md  # Long-form Chef Marco prompt; vision/image workflow, safety
-    ├── model_settings.md     # Suggested model params (temperature, safety, formatting)
-    └── usage_example.py      # Example: load prompt from MD, call Responses API (text-only)
+├── prompts/                 # Prompt and model settings
+│   ├── chef_marco_system.md     # Chef Marco’s long-form prompt
+│   ├── model_settings.md        # Model parameter suggestions
+│   └── usage_example.py         # Example of loading a prompt and calling the API
 ```
+
+---
+
+## Notes on Extra/Missing Items
+
+- **Extra:** `.env`, `.venv/`, `node_modules/`, `_backup/`, `.expo/`, `__pycache__/`, `__tests__/`, and snapshot folders are present but not part of the main codebase. Some folders are empty or auto-generated.
+- **Missing in original STRUCTURE.md:** The `mobile/React-Native-Snapchat-Clone/` subproject and its internal structure, as well as some config/scripts, are now documented above.
+
+---
+
+## Concise Descriptions (by folder)
+
+**Root:**
+- `.gitignore` — Git ignore rules.
+- `STRUCTURE.md` — Directory tree and file descriptions.
+- `TODO.md` — Per-file checklist and tasks.
+- `run-local.ps1` — PowerShell script to run the project locally.
+- `_backup/` — (Empty) Placeholder for backups.
+- `.env` — Local environment variables (not in VCS).
+- `.venv/` — Python virtual environment (auto-generated).
+- `node_modules/` — Node.js dependencies (auto-generated).
+
+**backend/**
+- `README.md` — Backend setup, endpoints, and usage.
+- `requirements.txt` — Python dependencies (FastAPI, OpenAI, etc.).
+- `run.ps1` — PowerShell script to start the API.
+- `test_analyze.ps1` — Script to test the analyze endpoint.
+- `scripts/` — Utility scripts for batch, dev, and voice assistant tasks.
+- `snapdish/` — Main backend code: FastAPI app, OpenAI client, prompts, schemas, commerce, tools, and voice agent.
+- `__pycache__/` — Python bytecode cache (auto-generated).
+
+**docs/**
+- `CHAT_UI.md` — Chat UI design and data shape.
+- `COMMERCE.md` — Agentic Commerce Protocol and implementation.
+- `DEVELOPER_NOTES.md` — OpenAI references, agent skills, and evals.
+- `FRONTEND_TEMPLATES.md` — UI templates and recommendations.
+- `MOBILE_APP.md` — Mobile app structure, stack, and API.
+- `PRODUCT_FEED.md` — Product feed onboarding and field reference.
+- `PRODUCTION_READINESS.md` — Production readiness review: backend/frontend overview, gaps, and checklists.
+- `PROMPTING_RESOURCES.md` — Prompting tools, guides, and papers.
+
+**examples/chat-ui/**
+- `index.html` — Mobile-first chat UI mockup.
+- `styles.css` — Mobile-first CSS for chat UI.
+- `README.md` — How to use the chat UI example.
+
+**mobile/**
+- `README.md` — How to run and customize the mobile app.
+- `TEMPLATE_SOURCE.md` — UI template and icon source documentation.
+- `app.json`, `babel.config.js`, `eas.json`, `tamagui.config.ts`, `tsconfig.json` — Expo and TypeScript configs.
+- `assets/` — (Empty) Placeholder for assets.
+- `snapdish/` — (Empty) Placeholder for future code.
+- `src/api/client.ts` — API client for analyze/voice endpoints.
+- `React-Native-Snapchat-Clone/` — Full-featured Expo React Native app (see below).
+
+**mobile/React-Native-Snapchat-Clone/**
+- `app/` — Expo Router structure for screens and navigation.
+- `assets/` — Fonts and images.
+- `components/` — UI components (camera, chat, navigation, etc.).
+- `constants/` — Color themes.
+- `hooks/` — Custom React hooks.
+- `scripts/` — Project reset script.
+- `src/api/` — API client and initialization.
+- `tsconfig.json`, `babel.config.js`, etc. — Project configs.
+- `node_modules/` — Node.js dependencies (auto-generated).
+
+**prompts/**
+- `chef_marco_system.md` — Chef Marco’s long-form prompt.
+- `model_settings.md` — Model parameter suggestions.
+- `usage_example.py` — Example of loading a prompt and calling the API.
 
 ---
 

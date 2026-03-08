@@ -37,6 +37,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       [
         "expo-media-library",
         {
@@ -65,7 +66,12 @@
       },
       "eas": {
         "projectId": "e4061e7c-2a7f-4c8b-be77-81831dad41a9"
-      }
+      },
+      "BACKEND_URL": "",
+      "COGNITO_DOMAIN": "snapdish-auth.auth.us-east-1.amazoncognito.com",
+      "COGNITO_CLIENT_ID": "4n5kjn0iaslii88d28si3fe7mc",
+      "COGNITO_REGION": "us-east-1",
+      "COGNITO_USER_POOL_ID": "us-east-1_oQEiFem8Q"
     }
   }
 }

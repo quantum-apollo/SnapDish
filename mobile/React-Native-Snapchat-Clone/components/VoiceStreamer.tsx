@@ -1,163 +1,196 @@
+﻿import { useEffect, useRef, useState } from 'react';
+import { View, Alert } from 'react-native';
+import { useAudioRecorder, useAudioPlayer, IOSOutputFormat, AudioQuality } from 'expo-audio';
+import type { RecordingOptions } from 'expo-audio';
+import { File, Paths } from 'expo-file-system';
+import { voice } from '@/src/api/client';
+import { FAB, Text, useTheme } from 'react-native-paper';
 
-import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Switch, Platform } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAudioRecorder, RecordingPresets } from 'expo-audio';
-import Constants from 'expo-constants';
+// Records 16kHz mono LINEAR PCM → produces a WAV file the backend can decode as int16 PCM
+const PCM_RECORDING_OPTIONS: RecordingOptions = {
+  extension: '.wav',
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 256000,
+  ios: {
+    extension: '.wav',
+    outputFormat: IOSOutputFormat.LINEARPCM,
+    audioQuality: AudioQuality.HIGH,
+    sampleRate: 16000,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  android: {
+    extension: '.wav',
+    outputFormat: 'default',
+    audioEncoder: 'default',
+    sampleRate: 16000,
+  },
+  web: {},
+};
 
-// Use EAS secret for backend URL
-// Set your production backend URLs in app.json (extra) or EAS secrets
-const WS_URL = Constants.expoConfig?.extra?.BACKEND_WS_URL || process.env.BACKEND_WS_URL || 'wss://your-production-backend.com/v1/voice/stream';
-const VOICE_API_URL = Constants.expoConfig?.extra?.BACKEND_VOICE_URL || process.env.BACKEND_VOICE_URL || 'https://your-production-backend.com/v1/voice';
+/**
+ * Parse a WAV ArrayBuffer and extract the raw PCM data + sample rate.
+ * Walks RIFF chunks to find the "data" chunk, rather than assuming 44-byte offset.
+ */
+function stripWavHeaderFromBuffer(buf: ArrayBuffer): { pcmBase64: string; sampleRate: number } {
+  const bytes = new Uint8Array(buf);
+  const view = new DataView(buf);
+  let sampleRate = 16000;
+  if (bytes.length > 28) sampleRate = view.getUint32(24, true);
+  let dataOffset = 44; // safe fallback
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+    const size = view.getUint32(offset + 4, true);
+    if (id === 'data') { dataOffset = offset + 8; break; }
+    offset += 8 + size + (size % 2 !== 0 ? 1 : 0);
+  }
+  const pcmBytes = bytes.slice(dataOffset);
+  let binary = '';
+  for (let i = 0; i < pcmBytes.length; i++) binary += String.fromCharCode(pcmBytes[i]);
+  return { pcmBase64: btoa(binary), sampleRate };
+}
 
+/** Wrap raw PCM int16 base64 in a RIFF WAV container, returning Uint8Array bytes. */
+function buildWavBytes(pcmBase64: string, sampleRate: number): Uint8Array {
+  const pcmBinary = atob(pcmBase64);
+  const dataSize = pcmBinary.length;
+  const out = new Uint8Array(44 + dataSize);
+  const view = new DataView(out.buffer);
+  const w = (o: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  w(8, 'WAVE');
+  w(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);           // PCM
+  view.setUint16(22, 1, true);           // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byteRate
+  view.setUint16(32, 2, true);           // blockAlign
+  view.setUint16(34, 16, true);          // bitsPerSample
+  w(36, 'data');
+  view.setUint32(40, dataSize, true);
+  for (let i = 0; i < pcmBinary.length; i++) out[44 + i] = pcmBinary.charCodeAt(i);
+  return out;
+}
 
-
-
-export default function VoiceStreamer({ onTranscript, onError }: {
+interface VoiceStreamerProps {
   onTranscript?: (text: string) => void;
   onError?: (err: Error) => void;
-}) {
-  const ws = useRef<WebSocket | null>(null);
+}
 
-  // Use Expo's built-in HIGH_QUALITY preset for standards compliance
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const [streamingMode, setStreamingMode] = useState(false); // false = voice message, true = real-time
-  const [recordingError, setRecordingError] = useState<string | null>(null);
+/**
+ * VoiceStreamer — Bidirectional conversational AI voice component.
+ * User speaks → 16kHz PCM sent to /v1/voice → Chef Marco's PCM response played back.
+ * Enables back-and-forth voice conversation with multimodal Chef Marco AI.
+ */
+export default function VoiceStreamer({ onTranscript, onError }: VoiceStreamerProps) {
+  const recorder = useAudioRecorder(PCM_RECORDING_OPTIONS);
+  const player = useAudioPlayer();
+  const [isActive, setIsActive] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [statusText, setStatusText] = useState('Tap to speak with Chef Marco');
+  const tempFileRef = useRef<File | null>(null);
 
+  // Clean up cached response audio on unmount
   useEffect(() => {
     return () => {
-      ws.current?.close();
+      try { tempFileRef.current?.delete(); } catch { /* ignore */ }
     };
   }, []);
 
-  // Real-time streaming logic (PCM chunk streaming)
-  const handleStartStreaming = async () => {
-    setRecordingError(null);
-    try {
-      ws.current = new WebSocket(WS_URL);
-      ws.current.binaryType = 'arraybuffer';
-      ws.current.onopen = async () => {
-        try {
-          await recorder.prepareToRecordAsync();
-          recorder.record();
-          // Optionally, you can use a polling or event-based system to get PCM chunks if supported
-        } catch (err) {
-          setRecordingError((err as Error).message || String(err));
-          if (onError) onError(err as Error);
-        }
-      };
-      ws.current.onmessage = (event) => {
-        if (onTranscript) onTranscript(event.data);
-        // Optionally: handle streaming audio response here
-      };
-      ws.current.onerror = (e) => {
-        setRecordingError('WebSocket error');
-        if (onError) onError(new Error('WebSocket error'));
-      };
-    } catch (err) {
-      setRecordingError((err as Error).message || String(err));
-      if (onError) onError(err as Error);
-    }
-  };
-
-  // Voice message logic (record, then send whole file)
-  const handleStartMessage = async () => {
-    setRecordingError(null);
+  async function handleStart() {
     try {
       await recorder.prepareToRecordAsync();
       recorder.record();
-    } catch (err) {
-      setRecordingError((err as Error).message || String(err));
-      if (onError) onError(err as Error);
+      setIsActive(true);
+      setStatusText('Listening...');
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      setStatusText('Microphone error');
+      onError?.(err);
     }
-  };
+  }
 
-  const handleStop = async () => {
-    setRecordingError(null);
+  async function handleStop() {
+    if (!isActive) return;
     try {
       await recorder.stop();
+      setIsActive(false);
+      setIsLoading(true);
+      setStatusText('Chef Marco is thinking...');
+
       const uri = recorder.uri;
-      if (streamingMode) {
-        ws.current?.send('END');
-        ws.current?.close();
-      } else {
-        if (uri) {
-          const response = await fetch(uri);
-          const blob = await response.blob();
-          // Send blob to backend (POST /v1/voice)
-          const formData = new FormData();
-          formData.append('audio', blob, 'voice.m4a');
-          await fetch(VOICE_API_URL, {
-            method: 'POST',
-            body: formData,
-          });
+      if (!uri) throw new Error('No audio recorded');
+
+      // Read the WAV file via expo-file-system v2 class API
+      const recordingFile = new File(uri);
+      const audioArrayBuffer = await recordingFile.arrayBuffer();
+      // Strip RIFF header → raw PCM base64 for backend
+      const { pcmBase64, sampleRate } = stripWavHeaderFromBuffer(audioArrayBuffer);
+
+      const res = await voice({ audio_base64: pcmBase64, sample_rate: sampleRate });
+      onTranscript?.('Voice response received');
+
+      // Wrap backend PCM response in WAV container → write to cache → play
+      const wavResponseBytes = buildWavBytes(res.audio_base64, res.sample_rate ?? 24000);
+      const responseFile = new File(Paths.cache, 'chef_response_' + Date.now() + '.wav');
+      const writer = responseFile.writableStream().getWriter();
+      await writer.write(wavResponseBytes);
+      await writer.close();
+
+      try { tempFileRef.current?.delete(); } catch { /* ignore */ }
+      tempFileRef.current = responseFile;
+
+      player.replace({ uri: responseFile.uri });
+      player.play();
+      setIsPlaying(true);
+      setStatusText('Chef Marco is speaking...');
+
+      // Poll until playback ends (expo-audio Player)
+      const checkDone = setInterval(() => {
+        if (!player.playing) {
+          clearInterval(checkDone);
+          setIsPlaying(false);
+          setStatusText('Tap to speak with Chef Marco');
         }
-      }
-    } catch (err) {
-      setRecordingError((err as Error).message || String(err));
-      if (onError) onError(err as Error);
+      }, 500);
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      setIsLoading(false);
+      setIsPlaying(false);
+      setStatusText('Error — tap to try again');
+      Alert.alert('Voice Error', err.message);
+      onError?.(err);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }
+
+  // Pick FAB icon and variant for the current state
+  const fabIcon = isLoading ? 'loading' : isActive ? 'stop' : isPlaying ? 'volume-high' : 'microphone';
+  const fabVariant: 'primary' | 'secondary' | 'tertiary' | 'surface' = isActive
+    ? 'tertiary'
+    : isPlaying
+    ? 'secondary'
+    : 'primary';
+  const { colors } = useTheme();
 
   return (
-    <View style={styles.container}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={{ marginRight: 8, color: '#222', fontSize: 14 }}>Voice Msg</Text>
-        <Switch
-          value={streamingMode}
-          onValueChange={setStreamingMode}
-          thumbColor={streamingMode ? '#FF6B6B' : '#ccc'}
-          trackColor={{ false: '#eee', true: '#FF6B6B' }}
-        />
-        <Text style={{ marginLeft: 8, color: '#222', fontSize: 14 }}>Real-Time</Text>
-      </View>
-      <TouchableOpacity
-        style={[styles.micButton, recorder.isRecording && styles.micButtonActive]}
-        onPress={recorder.isRecording ? handleStop : (streamingMode ? handleStartStreaming : handleStartMessage)}
-        accessibilityLabel={recorder.isRecording ? 'Stop recording' : 'Start recording'}
-        activeOpacity={0.7}
-      >
-        <MaterialCommunityIcons
-          name={recorder.isRecording ? 'microphone' : 'microphone-outline'}
-          size={36}
-          color={recorder.isRecording ? '#fff' : '#FF6B6B'}
-        />
-        {recorder.isRecording && (
-          <ActivityIndicator style={styles.recordingIndicator} color="#fff" size="small" />
-        )}
-      </TouchableOpacity>
-      {/* Optionally show status or error */}
-      {recordingError && (
-        <Text style={{ color: 'red', marginTop: 8 }}>{recordingError}</Text>
-      )}
+    <View style={{ alignItems: 'center', gap: 8, paddingVertical: 12 }}>
+      <FAB
+        icon={fabIcon}
+        variant={fabVariant}
+        loading={isLoading}
+        onPress={isActive ? handleStop : handleStart}
+        disabled={isLoading}
+        label={statusText}
+        size="medium"
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { marginVertical: 12, alignItems: 'center', justifyContent: 'center' },
-  micButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FF6B6B',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    marginBottom: 4,
-  },
-  micButtonActive: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF6B6B',
-  },
-  recordingIndicator: {
-    position: 'absolute',
-    right: 10,
-    bottom: 10,
-  },
-});
