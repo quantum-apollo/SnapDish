@@ -1,0 +1,28 @@
+name: CI/CD
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend Test
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pytest
+      - name: Mobile Lint
+        run: |
+          cd mobile/React-Native-Snapchat-Clone
+          npm ci
+          npm run lint
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker Build
+        run: docker build -t snapdish backend/
+
